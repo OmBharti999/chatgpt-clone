@@ -1,5 +1,8 @@
 import { Author } from "@/app/_contexts/ChatContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { Edit, Edit2 } from "lucide-react";
 import React from "react";
 
 const Message = ({
@@ -25,6 +28,11 @@ const Message = ({
         />
         <AvatarFallback>{isUser ? "U" : "AI"}</AvatarFallback>
       </Avatar>
+      <div className="flex">
+        <Button variant="ghost" onClick={() => {}} className={cn({ "hidden": !isUser })} size="icon">
+          <Edit2  />
+        </Button>
+      </div>
       <div className="bg-blue-100 dark:bg-blue-900 rounded-lg p-4 max-w-[80%]">
         <p className="text-sm">{content}</p>
       </div>
