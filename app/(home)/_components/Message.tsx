@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 
 import type { Author } from "@/app/_types/chat";
 
-const Message = ({
+export const Message = ({
   content,
 
   isUser,
@@ -45,5 +45,3 @@ const Message = ({
     </div>
   );
 };
-
-export default Message;

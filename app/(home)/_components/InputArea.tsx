@@ -5,6 +5,7 @@ import { useChatContext } from "@/app/_contexts/ChatContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Send } from "lucide-react";
+import { AUTHOR } from "@/app/_types/chat";
 
 export const InputArea = () => {
   const { setChat } = useChatContext();
@@ -16,7 +17,7 @@ export const InputArea = () => {
       setChat((prevChat) => [
         ...prevChat,
         {
-          author: "Human",
+          author: AUTHOR.HUMAN,
           content: inputValue.trim(),
           id: `${prevChat.length+1}`,
         },
