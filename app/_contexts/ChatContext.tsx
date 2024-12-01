@@ -1,3 +1,5 @@
+"use client";
+
 import { useContext, createContext, useState, Dispatch, SetStateAction, ReactNode } from "react";
 
 type Author = "AI" | "Human";
