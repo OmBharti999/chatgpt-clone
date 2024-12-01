@@ -18,7 +18,7 @@ export const InputArea = () => {
         {
           author: "Human",
           content: inputValue.trim(),
-          id: `${prevChat.length}`,
+          id: `${prevChat.length+1}`,
         },
       ]);
       setInputValue("");
