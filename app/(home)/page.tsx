@@ -1,4 +1,4 @@
-import { ChatArea, Header, Sidebar, InputArea } from "./_components";
+import { ChatArea, InputArea } from "./_components";
 
 export default function Home() {
   return (
