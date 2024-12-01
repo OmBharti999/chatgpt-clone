@@ -13,8 +13,6 @@ const layout = ({ children }: { children: ReactNode }) => {
           {children}
         </main>
       </div>
-
-      {children}
     </ChatContextProvider>
   );
 };
