@@ -1,8 +1,15 @@
 "use client";
 
-import { useContext, createContext, useState, Dispatch, SetStateAction, ReactNode } from "react";
+import {
+  useContext,
+  createContext,
+  useState,
+  Dispatch,
+  SetStateAction,
+  ReactNode,
+} from "react";
 
-type Author = "AI" | "Human";
+export type Author = "AI" | "Human";
 
 interface Chat {
   id: string;
@@ -22,8 +29,22 @@ const defaultValue: ChatContextType = {
 
 const ChatContext = createContext<ChatContextType>(defaultValue);
 
+const mockChat: Chat[] = [
+  {
+    id: "1",
+    content: "Hello, ChatGPT! How are you today?",
+    author: "Human",
+  },
+  {
+    id: "2",
+    content:
+      "Hello! As an AI language model, I don't have feelings, but I'm functioning well and ready to assist you how can I help you today?",
+    author: "AI",
+  },
+];
+
 export const ChatContextProvider = ({ children }: { children: ReactNode }) => {
-  const [chat, setChat] = useState<Chat[]>([]);
+  const [chat, setChat] = useState<Chat[]>(mockChat);
   return (
     <ChatContext.Provider value={{ chat, setChat }}>
       {children}
@@ -34,4 +55,3 @@ export const ChatContextProvider = ({ children }: { children: ReactNode }) => {
 export const useChatContext = () => {
   return useContext(ChatContext);
 };
-
