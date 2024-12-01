@@ -8,8 +8,7 @@ import {
   SetStateAction,
   ReactNode,
 } from "react";
-
-export type Author = "AI" | "Human";
+import { AUTHOR, type Author } from "../_types/chat";
 
 interface Chat {
   id: string;
@@ -33,13 +32,13 @@ const mockChat: Chat[] = [
   {
     id: "1",
     content: "Hello, ChatGPT! How are you today?",
-    author: "Human",
+    author: AUTHOR.HUMAN,
   },
   {
     id: "2",
     content:
       "Hello! As an AI language model, I don't have feelings, but I'm functioning well and ready to assist you how can I help you today?",
-    author: "AI",
+    author: AUTHOR.AI,
   },
 ];
 
