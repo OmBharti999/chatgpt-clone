@@ -1,6 +1,7 @@
 "use client";
 
-import { useChatContext } from "@/app/_contexts";
+import { useChatContext } from "@/app/_hooks";
+
 import { Message } from "./";
 
 export const ChatArea = () => {
