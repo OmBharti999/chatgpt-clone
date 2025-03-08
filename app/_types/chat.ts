@@ -1,6 +1,6 @@
 export enum AUTHOR {
-    AI = "AI",
-    HUMAN = "Human",
+  AI = "AI",
+  HUMAN = "Human",
 }
 
 export type Author = AUTHOR.AI | AUTHOR.HUMAN;
@@ -28,3 +28,13 @@ export interface ChatState {
   activeBranchId: string;
 }
 
+export interface BranchMessage {
+  id: string;
+  content: string;
+  role: "user" | "assistant";
+  parentId?: string;
+  branchId: string;
+  versions: BranchMessage[];
+  versionIndex: number;
+  isEdited: boolean;
+}
