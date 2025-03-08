@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useChatContext } from "@/app/_contexts/ChatContext";
+import { useChatContext } from "@/app/_hooks";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Send } from "lucide-react";
