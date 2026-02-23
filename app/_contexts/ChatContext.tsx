@@ -6,219 +6,183 @@ import {
   Dispatch,
   SetStateAction,
   ReactNode,
+  useMemo,
 } from "react";
-import { AUTHOR, type Author } from "../_types/chat";
+import type { Turn, VariantMeta } from "@/app/_types/chat";
 
-interface Chat {
-  id: string;
-  content: string;
-  author: Author;
-}
+type NavigateDirection = "prev" | "next";
 
 interface ChatContextType {
-  chat: Chat[];
-  setChat: Dispatch<SetStateAction<Chat[]>>;
+  turns: Turn[];
+  visibleTurns: Turn[];
+  sendPrompt: (prompt: string) => void;
+  editPrompt: (turnId: string, prompt: string) => void;
+  navigateVariant: (turnId: string, direction: NavigateDirection) => void;
+  getVariantMeta: (turnId: string) => VariantMeta;
+  activeLeafId: string | null;
+  setTurns: Dispatch<SetStateAction<Turn[]>>;
 }
 
 const defaultValue: ChatContextType = {
-  chat: [],
-  setChat: () => {},
+  turns: [],
+  visibleTurns: [],
+  sendPrompt: () => {},
+  editPrompt: () => {},
+  navigateVariant: () => {},
+  getVariantMeta: () => ({ current: 1, total: 1 }),
+  activeLeafId: null,
+  setTurns: () => {},
 };
 
 export const ChatContext = createContext<ChatContextType>(defaultValue);
 
-const mockChat: Chat[] = [
+const now = Date.now();
+
+const mockTurns: Turn[] = [
   {
     id: "1",
-    content: "Hello, ChatGPT! How are you today?",
-    author: AUTHOR.HUMAN,
-  },
-  {
-    id: "2",
-    content:
-      "Hello! As an AI language model, I don't have feelings, but I'm functioning well and ready to assist you how can I help you today?",
-    author: AUTHOR.AI,
+    parentId: null,
+    prompt: "Hello, ChatGPT! How are you today?",
+    response:
+      "Hello! As an AI language model, I don't have feelings, but I'm functioning well and ready to assist you. How can I help today?",
+    createdAt: now,
+    updatedAt: now,
   },
 ];
 
 export const ChatContextProvider = ({ children }: { children: ReactNode }) => {
-  const [chat, setChat] = useState<Chat[]>(mockChat);
+  const [turns, setTurns] = useState<Turn[]>(mockTurns);
+  const [activeLeafId, setActiveLeafId] = useState<string | null>(
+    mockTurns[mockTurns.length - 1]?.id ?? null
+  );
+
+  const childrenByParent = useMemo(() => {
+    const map = new Map<string | null, Turn[]>();
+    turns.forEach((turn) => {
+      const siblings = map.get(turn.parentId) ?? [];
+      siblings.push(turn);
+      map.set(turn.parentId, siblings);
+    });
+    map.forEach((siblings) =>
+      siblings.sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id))
+    );
+    return map;
+  }, [turns]);
+
+  const turnById = useMemo(
+    () => new Map(turns.map((turn) => [turn.id, turn])),
+    [turns]
+  );
+
+  const getPathToTurn = (turnId: string | null) => {
+    if (!turnId) return [];
+    const path: Turn[] = [];
+    let currentId: string | null = turnId;
+    while (currentId) {
+      const currentTurn = turnById.get(currentId);
+      if (!currentTurn) break;
+      path.unshift(currentTurn);
+      currentId = currentTurn.parentId;
+    }
+    return path;
+  };
+
+  const getDeepestPath = (startId: string) => {
+    const path: Turn[] = [];
+    let currentId: string | null = startId;
+    while (currentId) {
+      const current = turnById.get(currentId);
+      if (!current) break;
+      path.push(current);
+      const nextChildren = childrenByParent.get(current.id) ?? [];
+      currentId = nextChildren[nextChildren.length - 1]?.id ?? null;
+    }
+    return path;
+  };
+
+  const visibleTurns = getPathToTurn(activeLeafId);
+
+  const buildResponse = (prompt: string) =>
+    `You said: "${prompt}". This is a placeholder assistant response.`;
+
+  const sendPrompt = (prompt: string) => {
+    const trimmed = prompt.trim();
+    if (!trimmed) return;
+    const ts = Date.now();
+    const newTurn: Turn = {
+      id: `${ts}-${Math.random().toString(36).slice(2, 8)}`,
+      parentId: activeLeafId,
+      prompt: trimmed,
+      response: buildResponse(trimmed),
+      createdAt: ts,
+      updatedAt: ts,
+    };
+    setTurns((prev) => [...prev, newTurn]);
+    setActiveLeafId(newTurn.id);
+  };
+
+  const editPrompt = (turnId: string, prompt: string) => {
+    const trimmed = prompt.trim();
+    if (!trimmed) return;
+    const turnToEdit = turnById.get(turnId);
+    if (!turnToEdit) return;
+
+    const ts = Date.now();
+    const newTurn: Turn = {
+      id: `${ts}-${Math.random().toString(36).slice(2, 8)}`,
+      parentId: turnToEdit.parentId,
+      prompt: trimmed,
+      response: buildResponse(trimmed),
+      createdAt: ts,
+      updatedAt: ts,
+    };
+    setTurns((prev) => [...prev, newTurn]);
+    setActiveLeafId(newTurn.id);
+  };
+
+  const navigateVariant = (turnId: string, direction: NavigateDirection) => {
+    const targetTurn = turnById.get(turnId);
+    if (!targetTurn) return;
+    const siblings = childrenByParent.get(targetTurn.parentId) ?? [];
+    const currentIndex = siblings.findIndex((item) => item.id === targetTurn.id);
+    if (currentIndex < 0 || siblings.length < 2) return;
+
+    const nextIndex =
+      direction === "prev"
+        ? Math.max(0, currentIndex - 1)
+        : Math.min(siblings.length - 1, currentIndex + 1);
+    if (nextIndex === currentIndex) return;
+
+    const selectedVariant = siblings[nextIndex];
+    const nextPath = getDeepestPath(selectedVariant.id);
+    setActiveLeafId(nextPath[nextPath.length - 1]?.id ?? selectedVariant.id);
+  };
+
+  const getVariantMeta = (turnId: string): VariantMeta => {
+    const targetTurn = turnById.get(turnId);
+    if (!targetTurn) return { current: 1, total: 1 };
+    const siblings = childrenByParent.get(targetTurn.parentId) ?? [];
+    const index = siblings.findIndex((item) => item.id === turnId);
+    return {
+      current: index >= 0 ? index + 1 : 1,
+      total: Math.max(siblings.length, 1),
+    };
+  };
+
   return (
-    <ChatContext.Provider value={{ chat, setChat }}>
+    <ChatContext.Provider
+      value={{
+        turns,
+        visibleTurns,
+        sendPrompt,
+        editPrompt,
+        navigateVariant,
+        getVariantMeta,
+        activeLeafId,
+        setTurns,
+      }}
+    >
       {children}
     </ChatContext.Provider>
   );
 };
-
-// "use client";
-
-// import { createContext, useReducer, ReactNode } from "react";
-// import { Author, Message, Branch, ChatState, AUTHOR } from "@/app/_types/chat";
-
-// type ChatAction =
-//   | { type: "ADD_MESSAGE"; payload: { content: string; author: Author } }
-//   | { type: "EDIT_MESSAGE"; payload: { messageId: string; content: string } }
-//   | { type: "NAVIGATE_EDIT"; payload: { messageId: string; direction: "prev" | "next" } };
-
-// const initialState: ChatState = {
-//   branches: [
-//     {
-//       id: "main",
-//       parentBranchId: null,
-//       messages: [],
-//       isActive: true,
-//     },
-//   ],
-//   activeBranchId: "main",
-//   // editHistory: {},
-// };
-
-// function chatReducer(state: ChatState, action: ChatAction): ChatState {
-//   switch (action.type) {
-//     case "ADD_MESSAGE": {
-//       const activeBranch = state.branches.find(
-//         (branch) => branch.id === state.activeBranchId
-//       )!;
-//       const newMessage: Message = {
-//         id: Date.now().toString(),
-//         content: action.payload.content,
-//         author: action.payload.author,
-//         parentId: activeBranch.messages[activeBranch.messages.length - 1]?.id || null,
-//         branchId: activeBranch.id,
-//         timestamp: Date.now(),
-//         isEdited: false,
-//       };
-
-//       const updatedBranch = {
-//         ...activeBranch,
-//         messages: [...activeBranch.messages, newMessage],
-//       };
-
-//       // Add AI response
-//       const aiResponse: Message = {
-//         id: (Date.now() + 1).toString(),
-//         content: "I will respond you later.",
-//         author: AUTHOR.AI,
-//         parentId: newMessage.id,
-//         branchId: activeBranch.id,
-//         timestamp: Date.now() + 1,
-//         isEdited: false,
-//       };
-
-//       updatedBranch.messages.push(aiResponse);
-
-//       return {
-//         ...state,
-//         branches: state.branches.map((branch) =>
-//           branch.id === state.activeBranchId ? updatedBranch : branch
-//         ),
-//       };
-//     }
-
-//     case "EDIT_MESSAGE": {
-//       const activeBranch = state.branches.find(
-//         (branch) => branch.id === state.activeBranchId
-//       )!;
-//       const messageToEdit = activeBranch.messages.find(
-//         (msg) => msg.id === action.payload.messageId
-//       )!;
-
-//       // Create a new branch
-//       const newBranchId = `branch-${Date.now()}`;
-//       const newBranch: Branch = {
-//         id: newBranchId,
-//         parentBranchId: state.activeBranchId,
-//         messages: [
-//           ...activeBranch.messages.slice(
-//             0,
-//             activeBranch.messages.findIndex((msg) => msg.id === messageToEdit.id)
-//           ),
-//           {
-//             ...messageToEdit,
-//             id: Date.now().toString(),
-//             content: action.payload.content,
-//             branchId: newBranchId,
-//             timestamp: Date.now(),
-//             isEdited: true,
-//             originalMessageId: messageToEdit.id,
-//           },
-//         ],
-//         isActive: true,
-//       };
-
-//       // Add AI response to the new branch
-//       const aiResponse: Message = {
-//         id: (Date.now() + 1).toString(),
-//         content: "I will respond you later.",
-//         author: "AI",
-//         parentId: newBranch.messages[newBranch.messages.length - 1].id,
-//         branchId: newBranchId,
-//         timestamp: Date.now() + 1,
-//         isEdited: false,
-//       };
-
-//       newBranch.messages.push(aiResponse);
-
-//       // Update edit history
-//       const updatedEditHistory = { ...state.editHistory };
-//       if (!updatedEditHistory[messageToEdit.id]) {
-//         updatedEditHistory[messageToEdit.id] = [];
-//       }
-//       updatedEditHistory[messageToEdit.id].push(newBranchId);
-
-//       return {
-//         ...state,
-//         activeBranchId: newBranchId,
-//         branches: state.branches
-//           .map((branch) => ({
-//             ...branch,
-//             isActive: false,
-//           }))
-//           .concat(newBranch),
-//         editHistory: updatedEditHistory,
-//       };
-//     }
-
-//     case "NAVIGATE_EDIT": {
-//       const { messageId, direction } = action.payload;
-//       const editHistory = state.editHistory[messageId] || [];
-//       const currentIndex = editHistory.indexOf(state.activeBranchId);
-//       let newIndex = currentIndex;
-
-//       if (direction === "prev" && currentIndex > 0) {
-//         newIndex--;
-//       } else if (direction === "next" && currentIndex < editHistory.length - 1) {
-//         newIndex++;
-//       }
-
-//       const newBranchId = editHistory[newIndex];
-
-//       return {
-//         ...state,
-//         activeBranchId: newBranchId,
-//         branches: state.branches.map((branch) => ({
-//           ...branch,
-//           isActive: branch.id === newBranchId,
-//         })),
-//       };
-//     }
-
-//     default:
-//       return state;
-//   }
-// }
-
-// export const ChatContext = createContext<{
-//   state: ChatState;
-//   dispatch: React.Dispatch<ChatAction>;
-// } | null>(null);
-
-// export function ChatProvider({ children }: { children: ReactNode }) {
-//   const [state, dispatch] = useReducer(chatReducer, initialState);
-
-//   return (
-//     <ChatContext.Provider value={{ state, dispatch }}>
-//       {children}
-//     </ChatContext.Provider>
-//   );
-// }
