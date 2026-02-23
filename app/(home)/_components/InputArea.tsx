@@ -5,23 +5,15 @@ import { useChatContext } from "@/app/_hooks";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Send } from "lucide-react";
-import { AUTHOR } from "@/app/_types/chat";
 
 export const InputArea = () => {
-  const { setChat } = useChatContext();
+  const { sendPrompt } = useChatContext();
   const [inputValue, setInputValue] = useState("");
 
   const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (inputValue.trim()) {
-      setChat((prevChat) => [
-        ...prevChat,
-        {
-          author: AUTHOR.HUMAN,
-          content: inputValue.trim(),
-          id: `${prevChat.length+1}`,
-        },
-      ]);
+      sendPrompt(inputValue);
       setInputValue("");
     }
   };

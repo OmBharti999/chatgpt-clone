@@ -1,1 +1,1 @@
-export { ChatContextProvider, useChatContext } from "./ChatContext";
+export { ChatContextProvider } from "./ChatContext";
