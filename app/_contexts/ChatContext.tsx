@@ -7,8 +7,9 @@ import {
   SetStateAction,
   ReactNode,
   useMemo,
+  useCallback,
 } from "react";
-import type { Turn, VariantMeta } from "@/app/_types/chat";
+import type { Turn, VariantMeta, ChatSession } from "@/app/_types/chat";
 
 type NavigateDirection = "prev" | "next";
 
@@ -21,6 +22,10 @@ interface ChatContextType {
   getVariantMeta: (turnId: string) => VariantMeta;
   activeLeafId: string | null;
   setTurns: Dispatch<SetStateAction<Turn[]>>;
+  chats: ChatSession[];
+  activeChatId: string | null;
+  startNewChat: () => void;
+  switchChat: (chatId: string) => void;
 }
 
 const defaultValue: ChatContextType = {
@@ -32,9 +37,17 @@ const defaultValue: ChatContextType = {
   getVariantMeta: () => ({ current: 1, total: 1 }),
   activeLeafId: null,
   setTurns: () => {},
+  chats: [],
+  activeChatId: null,
+  startNewChat: () => {},
+  switchChat: () => {},
 };
 
 export const ChatContext = createContext<ChatContextType>(defaultValue);
+
+function createChatId() {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
 
 const now = Date.now();
 
@@ -50,10 +63,63 @@ const mockTurns: Turn[] = [
   },
 ];
 
+const initialChat: ChatSession = {
+  id: "initial",
+  title: "Hello, ChatGPT! How are you today?",
+  turns: mockTurns,
+  activeLeafId: mockTurns[mockTurns.length - 1]?.id ?? null,
+  createdAt: now,
+};
+
 export const ChatContextProvider = ({ children }: { children: ReactNode }) => {
-  const [turns, setTurns] = useState<Turn[]>(mockTurns);
-  const [activeLeafId, setActiveLeafId] = useState<string | null>(
-    mockTurns[mockTurns.length - 1]?.id ?? null
+  const [chats, setChats] = useState<ChatSession[]>([initialChat]);
+  const [activeChatId, setActiveChatId] = useState<string | null>(
+    initialChat.id
+  );
+
+  const activeChat = useMemo(
+    () => chats.find((c) => c.id === activeChatId) ?? null,
+    [chats, activeChatId]
+  );
+
+  const turns = activeChat?.turns ?? [];
+  const activeLeafId = activeChat?.activeLeafId ?? null;
+
+  // Update the active chat's turns and activeLeafId in the chats array
+  const updateActiveChat = useCallback(
+    (newTurns: Turn[], newLeafId: string | null) => {
+      setChats((prev) =>
+        prev.map((chat) => {
+          if (chat.id !== activeChatId) return chat;
+          const title =
+            newTurns.length > 0
+              ? newTurns.find((t) => t.parentId === null)?.prompt.slice(0, 40) ??
+                chat.title
+              : chat.title;
+          return {
+            ...chat,
+            turns: newTurns,
+            activeLeafId: newLeafId,
+            title,
+          };
+        })
+      );
+    },
+    [activeChatId]
+  );
+
+  const setTurns: Dispatch<SetStateAction<Turn[]>> = useCallback(
+    (action) => {
+      setChats((prev) =>
+        prev.map((chat) => {
+          if (chat.id !== activeChatId) return chat;
+          const newTurns =
+            typeof action === "function" ? action(chat.turns) : action;
+          return { ...chat, turns: newTurns };
+        })
+      );
+    },
+    [activeChatId]
   );
 
   const childrenByParent = useMemo(() => {
@@ -64,7 +130,9 @@ export const ChatContextProvider = ({ children }: { children: ReactNode }) => {
       map.set(turn.parentId, siblings);
     });
     map.forEach((siblings) =>
-      siblings.sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id))
+      siblings.sort(
+        (a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id)
+      )
     );
     return map;
   }, [turns]);
@@ -117,8 +185,8 @@ export const ChatContextProvider = ({ children }: { children: ReactNode }) => {
       createdAt: ts,
       updatedAt: ts,
     };
-    setTurns((prev) => [...prev, newTurn]);
-    setActiveLeafId(newTurn.id);
+    const newTurns = [...turns, newTurn];
+    updateActiveChat(newTurns, newTurn.id);
   };
 
   const editPrompt = (turnId: string, prompt: string) => {
@@ -136,8 +204,8 @@ export const ChatContextProvider = ({ children }: { children: ReactNode }) => {
       createdAt: ts,
       updatedAt: ts,
     };
-    setTurns((prev) => [...prev, newTurn]);
-    setActiveLeafId(newTurn.id);
+    const newTurns = [...turns, newTurn];
+    updateActiveChat(newTurns, newTurn.id);
   };
 
   const navigateVariant = (turnId: string, direction: NavigateDirection) => {
@@ -155,7 +223,9 @@ export const ChatContextProvider = ({ children }: { children: ReactNode }) => {
 
     const selectedVariant = siblings[nextIndex];
     const nextPath = getDeepestPath(selectedVariant.id);
-    setActiveLeafId(nextPath[nextPath.length - 1]?.id ?? selectedVariant.id);
+    const newLeafId =
+      nextPath[nextPath.length - 1]?.id ?? selectedVariant.id;
+    updateActiveChat(turns, newLeafId);
   };
 
   const getVariantMeta = (turnId: string): VariantMeta => {
@@ -169,6 +239,22 @@ export const ChatContextProvider = ({ children }: { children: ReactNode }) => {
     };
   };
 
+  const startNewChat = useCallback(() => {
+    const newChat: ChatSession = {
+      id: createChatId(),
+      title: "New chat",
+      turns: [],
+      activeLeafId: null,
+      createdAt: Date.now(),
+    };
+    setChats((prev) => [newChat, ...prev]);
+    setActiveChatId(newChat.id);
+  }, []);
+
+  const switchChat = useCallback((chatId: string) => {
+    setActiveChatId(chatId);
+  }, []);
+
   return (
     <ChatContext.Provider
       value={{
@@ -180,6 +266,10 @@ export const ChatContextProvider = ({ children }: { children: ReactNode }) => {
         getVariantMeta,
         activeLeafId,
         setTurns,
+        chats,
+        activeChatId,
+        startNewChat,
+        switchChat,
       }}
     >
       {children}
