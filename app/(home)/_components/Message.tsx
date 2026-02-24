@@ -44,8 +44,8 @@ export const Message = ({
         <AvatarImage
           src={
             isUser
-              ? "/placeholder-user.jpg"
-              : "/placeholder.svg?height=40&width=40"
+              ? "/user.svg"
+              : "/ai.svg?height=40&width=40"
           }
           alt={isUser ? "Human" : "ChatGPT"}
         />
