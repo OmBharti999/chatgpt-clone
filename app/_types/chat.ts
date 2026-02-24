@@ -18,3 +18,11 @@ export interface VariantMeta {
   current: number;
   total: number;
 }
+
+export interface ChatSession {
+  id: string;
+  title: string;
+  turns: Turn[];
+  activeLeafId: string | null;
+  createdAt: number;
+}
